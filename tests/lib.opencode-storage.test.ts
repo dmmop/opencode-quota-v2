@@ -46,6 +46,9 @@ describe("opencode storage multi-session reads", () => {
     const conn = {
       get: vi.fn(() => ({ r: "assistant" })),
       all: vi.fn((sql: string, params?: unknown[]) => {
+        expect(sql).toContain(`FROM "session_message"`);
+        expect(sql).toContain("type = 'assistant'");
+        expect(sql).toContain("type AS role");
         expect(sql).toContain(
           "CASE WHEN json_valid(data) THEN json_extract(data, '$.time.completed') END",
         );
@@ -101,7 +104,8 @@ describe("opencode storage multi-session reads", () => {
     const conn = {
       get: vi.fn(() => ({ r: "assistant" })),
       all: vi.fn((sql: string) => {
-        expect(sql).toContain("lower(CASE WHEN json_valid(data)");
+        expect(sql).toContain("type = 'assistant'");
+        expect(sql).toContain("type AS role");
         expect(sql).not.toMatch(/SELECT[\s\S]*\bdata\b\s+FROM/);
         return [
           {
@@ -150,7 +154,7 @@ describe("opencode storage multi-session reads", () => {
     const conn = {
       get: vi.fn(() => ({ r: "assistant" })),
       all: vi.fn((sql: string) => {
-        expect(sql).toContain("CASE WHEN json_valid(data) THEN json_extract(data, '$.role') END");
+        expect(sql).toContain("CASE WHEN json_valid(data) THEN json_extract(data, '$.tokens.input') END");
         expect(sql).not.toMatch(/SELECT[\s\S]*\bdata\b\s+FROM/);
         return [];
       }),

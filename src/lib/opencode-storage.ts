@@ -8,10 +8,10 @@ import { pickFirstExistingPath } from "./path-pick.js";
 /**
  * Error thrown when a session is not found.
  *
- * With OpenCode >=1.2, sessions/messages live in SQLite (`opencode.db`).
- * This is thrown by iterAssistantMessagesForSession when the database is
- * missing/unreadable, the session id is invalid, or the session row does
- * not exist.
+ * OpenCode 2 stores sessions and messages in SQLite (`opencode.db`) under the
+ * `session_v2` and `session_message` tables. This is thrown by
+ * iterAssistantMessagesForSession when the database is missing/unreadable, the
+ * session id is invalid, or the session row does not exist.
  */
 export class SessionNotFoundError extends Error {
   constructor(
@@ -211,9 +211,9 @@ const PROJECTED_MESSAGE_COLUMNS = [
   "id",
   "session_id",
   "time_created",
-  `${guardedJsonScalar("$.role")} AS role`,
-  `${guardedJsonScalar("$.providerID")} AS provider_id`,
-  `${guardedJsonScalar("$.modelID")} AS model_id`,
+  "type AS role",
+  `${guardedJsonScalar("$.model.providerID")} AS provider_id`,
+  `${guardedJsonScalar("$.model.id")} AS model_id`,
   `${guardedJsonScalar("$.tokens.input")} AS tokens_input`,
   `${guardedJsonScalar("$.tokens.output")} AS tokens_output`,
   `${guardedJsonScalar("$.tokens.reasoning")} AS tokens_reasoning`,
@@ -222,10 +222,9 @@ const PROJECTED_MESSAGE_COLUMNS = [
   `${guardedJsonScalar("$.cost")} AS cost`,
   `${guardedJsonScalar("$.time.completed")} AS time_completed`,
   `${guardedJsonScalar("$.agent")} AS agent`,
-  `${guardedJsonScalar("$.mode")} AS mode`,
 ].join(", ");
 
-const ASSISTANT_ROLE_EXPRESSION = `lower(${guardedJsonScalar("$.role")}) = 'assistant'`;
+const ASSISTANT_FILTER = `type = 'assistant'`;
 
 function buildMessageQuery(params: {
   sessionID?: string;
@@ -262,10 +261,10 @@ function buildMessageQuery(params: {
     args.push(params.untilMs);
   }
 
-  where.push(ASSISTANT_ROLE_EXPRESSION);
+  where.push(ASSISTANT_FILTER);
 
   const sql =
-    `SELECT ${PROJECTED_MESSAGE_COLUMNS} FROM "message"` +
+    `SELECT ${PROJECTED_MESSAGE_COLUMNS} FROM "session_message"` +
     (where.length ? ` WHERE ${where.join(" AND ")}` : "") +
     ` ORDER BY time_created ASC, id ASC`;
 
@@ -314,7 +313,7 @@ function buildCompletedAssistantQuery(params: {
   const completedScalar = guardedJsonScalar("$.time.completed");
   const completedExpression = `CAST(${completedScalar} AS REAL)`;
   const where = [
-    ASSISTANT_ROLE_EXPRESSION,
+    ASSISTANT_FILTER,
     `CASE WHEN json_valid(data) THEN json_type(data, '$.time.completed') END IN ('integer', 'real')`,
     `${completedExpression} > 0`,
   ];
@@ -331,7 +330,7 @@ function buildCompletedAssistantQuery(params: {
 
   return {
     sql:
-      `SELECT ${PROJECTED_MESSAGE_COLUMNS} FROM "message"` +
+      `SELECT ${PROJECTED_MESSAGE_COLUMNS} FROM "session_message"` +
       ` WHERE ${where.join(" AND ")}` +
       ` ORDER BY ${completedExpression} ASC, id ASC`,
     args,
@@ -358,13 +357,13 @@ export async function getOpenCodeDbStats(): Promise<OpenCodeDbStats> {
 
   const conn = await db.open();
   try {
-    const sessionRow = conn.get<{ c: number }>(`SELECT count(*) as c FROM "session"`);
-    const messageRow = conn.get<{ c: number }>(`SELECT count(*) as c FROM "message"`);
+    const sessionRow = conn.get<{ c: number }>(`SELECT count(*) as c FROM "session_v2"`);
+    const messageRow = conn.get<{ c: number }>(`SELECT count(*) as c FROM "session_message"`);
 
     let assistantCount = 0;
     if (await hasJsonExtract(conn)) {
       const a = conn.get<{ c: number }>(
-        `SELECT count(*) as c FROM "message" WHERE ${guardedJsonScalar("$.role")} = 'assistant'`,
+        `SELECT count(*) as c FROM "session_message" WHERE type = 'assistant'`,
       );
       assistantCount = typeof a?.c === "number" ? a.c : 0;
     }
@@ -442,9 +441,10 @@ export async function iterAssistantMessagesForSession(params: {
 
   const conn = await db.open();
   try {
-    const exists = conn.get<{ ok: number }>(`SELECT 1 as ok FROM "session" WHERE id = ? LIMIT 1`, [
-      sessionID,
-    ]);
+    const exists = conn.get<{ ok: number }>(
+      `SELECT 1 as ok FROM "session_v2" WHERE id = ? LIMIT 1`,
+      [sessionID],
+    );
     if (!exists) {
       throw new SessionNotFoundError(sessionID, db.dbPath);
     }
@@ -508,7 +508,7 @@ export async function readAllSessionsIndex(): Promise<Record<string, OpenCodeSes
   const conn = await db.open();
   try {
     const rows = conn.all<SessionRow>(
-      `SELECT id, title, parent_id, time_created, time_updated FROM "session" ORDER BY time_created ASC, id ASC`,
+      `SELECT id, title, parent_id, time_created, time_updated FROM "session_v2" ORDER BY time_created ASC, id ASC`,
     );
 
     for (const row of rows) {
