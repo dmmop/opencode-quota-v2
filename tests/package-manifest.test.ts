@@ -152,9 +152,9 @@ describe("package manifest compatibility", () => {
     expect(pkg.devDependencies?.yaml).toBe("^2.8.3");
   });
 
-  it("keeps the public plugin peer broad and reference-compatible development targets exact", () => {
-    expect(pkg.peerDependencies?.["@opencode-ai/plugin"]).toBe("^1.4.3");
-    expect(pkg.devDependencies?.["@opencode-ai/plugin"]).toBe("1.18.1");
+  it("reflects the local OpenCode V2 plugin dependency override", () => {
+    expect(pkg.peerDependencies?.["@opencode/plugin"]).toBe("2.0.2");
+    expect(pkg.devDependencies?.["@opencode/plugin"]).toBe("2.0.2");
     expect(pkg.dependencies?.["@opentui/core"]).toBe("^0.5.10");
     expect(pkg.dependencies?.["@opentui/solid"]).toBe("^0.5.10");
     expect(readme).toContain("Node.js `>= 22` is required.");
