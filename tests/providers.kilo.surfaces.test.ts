@@ -116,7 +116,7 @@ describe("Kilo Gateway structured four-surface formatting", () => {
       expect(output).not.toContain("$");
     }
     for (const output of [outputs.command, outputs.toast, outputs.sidebar]) {
-      expect(output).toContain("31d 0h 0m");
+      expect(output).toContain("31d0h0m");
     }
     expect(outputs.compact).toContain("31d0h0m");
   });

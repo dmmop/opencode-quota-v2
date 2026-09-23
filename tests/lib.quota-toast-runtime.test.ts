@@ -1,7 +1,7 @@
 import { rm } from "fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_CONFIG } from "../src/lib/types.js";
+import type { DEFAULT_CONFIG } from "../src/lib/types.js";
 import {
   createAlibabaAuthModuleMock,
   createPluginTestClient as createClient,
@@ -839,6 +839,85 @@ describe("quota toast runtime state machine", () => {
     expect(providerB.fetch).toHaveBeenCalledOnce();
     expect(getToastMessage(clientB)).toContain("Second config");
     expect(getToastMessage(clientB)).not.toContain("First config");
+  });
+
+  it("separates rendered-message cache entries for each display option", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T10:00:00.000Z"));
+    const provider = {
+      id: "openai",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      fetch: vi.fn().mockResolvedValue({
+        attempted: true,
+        entries: [
+          {
+            accounting: {
+              ...TEST_ACCOUNTING,
+              observedAtIso: "2026-01-15T10:00:00.000Z",
+            },
+            name: "OpenAI Weekly",
+            percentRemaining: 81,
+            resetTimeIso: "2026-01-17T15:14:00.000Z",
+            fixedWindow: {
+              kind: "fixed_window",
+              startedAtIso: "2026-01-15T09:00:00.000Z",
+              observedAtIso: "2026-01-15T10:00:00.000Z",
+              endsAtIso: "2026-01-17T15:14:00.000Z",
+              fullReset: true,
+            },
+          },
+        ],
+        errors: [],
+      }),
+    };
+    mocks.getProviders.mockReturnValue([provider]);
+
+    mocks.loadConfig.mockResolvedValueOnce(makeToastConfig());
+    const defaultClient = createClient();
+    const { runtime: defaultRuntime } = await createRuntime(defaultClient);
+    await defaultRuntime.handleTrigger({
+      sessionID: "session-display-cache",
+      trigger: "session.idle",
+    });
+    expect(getToastMessage(defaultClient)).toContain("81% left");
+    expect(getToastMessage(defaultClient)).toContain("2d 5h 14m");
+
+    mocks.loadConfig.mockResolvedValueOnce(makeToastConfig({ resetTimeSpaced: false }));
+    const denseClient = createClient();
+    const { runtime: denseRuntime } = await createRuntime(denseClient);
+    await denseRuntime.handleTrigger({
+      sessionID: "session-display-cache",
+      trigger: "session.idle",
+    });
+    expect(getToastMessage(denseClient)).toContain("81% left");
+    expect(getToastMessage(denseClient)).toContain("2d5h14m");
+
+    mocks.loadConfig.mockResolvedValueOnce(
+      makeToastConfig({ percentDisplayMode: "used", percentLabelStyle: "bare" }),
+    );
+    const bareClient = createClient();
+    const { runtime: bareRuntime } = await createRuntime(bareClient);
+    await bareRuntime.handleTrigger({
+      sessionID: "session-display-cache",
+      trigger: "session.idle",
+    });
+    expect(getToastMessage(bareClient)).toContain("19%");
+    expect(getToastMessage(bareClient)).not.toContain("19% used");
+    expect(bareClient.tui.showToast).toHaveBeenCalledWith({
+      body: expect.objectContaining({ title: "Quota [Used]" }),
+    });
+
+    mocks.loadConfig.mockResolvedValueOnce(makeToastConfig({ quotaProjection: "runway" }));
+    const runwayClient = createClient();
+    const { runtime: runwayRuntime } = await createRuntime(runwayClient);
+    await runwayRuntime.handleTrigger({
+      sessionID: "session-display-cache",
+      trigger: "session.idle",
+    });
+    expect(getToastMessage(runwayClient)).toContain("Runs out");
+    expect(getToastMessage(defaultClient)).not.toContain("Runs out");
+
+    expect(provider.fetch).toHaveBeenCalledTimes(4);
   });
 
   it("emits reset text only from a fresh collection", async () => {

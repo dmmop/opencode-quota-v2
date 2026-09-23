@@ -7,7 +7,7 @@
  * - quota-command-format.ts (/quota command)
  */
 
-import type { PercentDisplayMode } from "./types.js";
+import type { PercentDisplayMode, PercentLabelStyle } from "./types.js";
 
 /**
  * Clamp a number to an integer within [min, max].
@@ -41,6 +41,35 @@ export function padLeft(str: string, width: number): string {
   return " ".repeat(width - str.length) + str;
 }
 
+export function wrapDisplayText(text: string, maxWidth: number): string[] {
+  if (maxWidth <= 0) return [];
+  const words = text.trim().split(/\s+/u).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+
+  for (const word of words) {
+    if (word.length > maxWidth) {
+      if (line) {
+        lines.push(line);
+        line = "";
+      }
+      for (let offset = 0; offset < word.length; offset += maxWidth) {
+        lines.push(word.slice(offset, offset + maxWidth));
+      }
+      continue;
+    }
+    const next = line ? `${line} ${word}` : word;
+    if (next.length <= maxWidth) {
+      line = next;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 /**
  * Render a progress bar of filled/empty blocks.
  */
@@ -67,12 +96,22 @@ export function resolveDisplayedPercent(
 export function formatDisplayedPercentLabel(
   percentRemaining: number,
   mode: PercentDisplayMode = "remaining",
+  style: PercentLabelStyle = "full",
 ): string {
   const displayedPercent = resolveDisplayedPercent(percentRemaining, mode);
-  return `${displayedPercent}% ${mode === "used" ? "used" : "left"}`;
+  const percent = `${displayedPercent}%`;
+  return style === "bare" ? percent : `${percent} ${mode === "used" ? "used" : "left"}`;
 }
 
 export const DISPLAYED_PERCENT_LABEL_WIDTH = "100% used".length;
+
+export function displayedPercentLabelWidth(style: PercentLabelStyle = "full"): number {
+  return style === "bare" ? "100%".length : DISPLAYED_PERCENT_LABEL_WIDTH;
+}
+
+export function formatQuotaModeHeading(mode: PercentDisplayMode = "remaining"): string {
+  return `Quota [${mode === "used" ? "Used" : "Remaining"}]`;
+}
 
 /**
  * Format a token count with K/M suffix for compactness.
@@ -151,8 +190,8 @@ export interface FormatResetCountdownOptions {
    * many decimal places.
    */
   decimals?: number;
-  /** Render adjacent exact units without spaces for width-constrained surfaces. */
-  compactUnits?: boolean;
+  /** Join exact compound countdown units with spaces. */
+  spaced?: boolean;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -193,9 +232,9 @@ export function formatResetCountdown(iso?: string, opts?: FormatResetCountdownOp
     return `0.5h`;
   }
 
-  const separator = opts?.compactUnits ? "" : " ";
-  if (days > 0) return `${days}d${separator}${hours}h${separator}${minutes}m`;
-  if (hours > 0) return `${hours}h${separator}${minutes}m`;
+  const separator = opts?.spaced ? " " : "";
+  if (days > 0) return [`${days}d`, `${hours}h`, `${minutes}m`].join(separator);
+  if (hours > 0) return [`${hours}h`, `${minutes}m`].join(separator);
   return `${minutes}m`;
 }
 

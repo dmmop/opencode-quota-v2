@@ -1,17 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildCompactQuotaStatusLine } from "../src/lib/tui-compact-format.js";
+import { TUI_SIDEBAR_MAX_WIDTH } from "../src/lib/tui-sidebar-format.js";
+import { DEFAULT_CONFIG } from "../src/lib/types.js";
 
 describe("buildCompactQuotaStatusLine", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("formats provider reset timestamps to the exact minute", () => {
+  it("formats dense provider reset timestamps when explicitly requested", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-15T10:00:00.000Z"));
 
     const line = buildCompactQuotaStatusLine({
+      resetTimeSpaced: false,
       maxWidth: 96,
       data: {
         entries: [
@@ -26,6 +29,29 @@ describe("buildCompactQuotaStatusLine", () => {
     });
 
     expect(line).toBe("OpenAI Weekly 50% 5d19h49m");
+  });
+
+  it("uses the resolved spacing default while keeping compact percentages bare", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T10:00:00.000Z"));
+
+    const line = buildCompactQuotaStatusLine({
+      percentDisplayMode: "used",
+      resetTimeSpaced: DEFAULT_CONFIG.resetTimeSpaced,
+      maxWidth: 96,
+      data: {
+        entries: [
+          {
+            name: "OpenAI Weekly",
+            percentRemaining: 81,
+            resetTimeIso: "2026-01-17T15:14:00.000Z",
+          },
+        ],
+        errors: [],
+      },
+    });
+
+    expect(line).toBe("OpenAI Weekly 19% 2d 5h 14m");
   });
 
   it("renders expired provider resets once", () => {
@@ -561,5 +587,85 @@ describe("buildCompactQuotaStatusLine", () => {
     expect(line).not.toContain("\u001b");
     expect(line).not.toContain("\u0007");
     expect(line).not.toContain("\u0003");
+  });
+
+  const TWO_VISIBLE_PROVIDERS = [
+    { name: "Copilot", group: "Copilot", percentRemaining: 5 },
+    { name: "OpenAI", group: "OpenAI ChatGPT Plus Plan", percentRemaining: 81 },
+  ] as const;
+
+  it("makes 36-column overflow explicit without inventing omitted quota values", () => {
+    const line = buildCompactQuotaStatusLine({
+      percentDisplayMode: "remaining",
+      maxWidth: TUI_SIDEBAR_MAX_WIDTH,
+      data: { entries: [...TWO_VISIBLE_PROVIDERS], errors: [] },
+    });
+
+    expect(line).toBe("Copilot 5% | +1");
+    expect(line.length).toBeLessThanOrEqual(TUI_SIDEBAR_MAX_WIDTH);
+    expect(line).not.toContain("81%");
+    expect(line).not.toContain("OpenAI");
+  });
+
+  it("keeps used and remaining modes when only one of two providers fits", () => {
+    const remaining = buildCompactQuotaStatusLine({
+      percentDisplayMode: "remaining",
+      maxWidth: TUI_SIDEBAR_MAX_WIDTH,
+      data: { entries: [...TWO_VISIBLE_PROVIDERS], errors: [] },
+    });
+    const used = buildCompactQuotaStatusLine({
+      percentDisplayMode: "used",
+      maxWidth: TUI_SIDEBAR_MAX_WIDTH,
+      data: { entries: [...TWO_VISIBLE_PROVIDERS], errors: [] },
+    });
+
+    expect(remaining).toBe("Copilot 5% | +1");
+    expect(used).toBe("Copilot 95% | +1");
+    expect(used.length).toBeLessThanOrEqual(TUI_SIDEBAR_MAX_WIDTH);
+  });
+
+  it("keeps overflow explicit at a narrower width", () => {
+    const line = buildCompactQuotaStatusLine({
+      percentDisplayMode: "remaining",
+      maxWidth: 20,
+      data: { entries: [...TWO_VISIBLE_PROVIDERS], errors: [] },
+    });
+
+    expect(line).toBe("Copilot 5% | +1");
+    expect(line.length).toBeLessThanOrEqual(20);
+  });
+
+  it("counts omitted visible providers in the overflow marker", () => {
+    const line = buildCompactQuotaStatusLine({
+      percentDisplayMode: "remaining",
+      maxWidth: TUI_SIDEBAR_MAX_WIDTH,
+      data: {
+        entries: [
+          ...TWO_VISIBLE_PROVIDERS,
+          { name: "GLM", group: "GLM Coding Plan Weekly", percentRemaining: 12 },
+        ],
+        errors: [],
+      },
+    });
+
+    expect(line).toBe("Copilot 5% | +2");
+    expect(line).not.toContain("12%");
+  });
+
+  it("does not append overflow when both visible providers fit", () => {
+    const line = buildCompactQuotaStatusLine({
+      percentDisplayMode: "remaining",
+      maxWidth: TUI_SIDEBAR_MAX_WIDTH,
+      data: {
+        entries: [
+          { name: "Copilot", group: "Copilot", percentRemaining: 5 },
+          { name: "OpenAI", group: "OpenAI", percentRemaining: 81 },
+        ],
+        errors: [],
+      },
+    });
+
+    expect(line).toBe("Copilot 5% | OpenAI 81%");
+    expect(line).not.toContain("+1");
   });
 });

@@ -416,6 +416,63 @@ describe("/quota command behavior", () => {
     expect(injected).not.toContain("81% left");
   });
 
+  it.each([
+    { label: "default spaced resets", resetTimeSpaced: undefined, expectedReset: "2d 5h 14m" },
+    { label: "the explicit dense-reset opt-out", resetTimeSpaced: false, expectedReset: "2d5h14m" },
+  ])("applies bare percent labels and $label to /quota output", async ({
+    resetTimeSpaced,
+    expectedReset,
+  }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T10:00:00.000Z"));
+    try {
+      mocks.loadConfig.mockResolvedValueOnce({
+        ...DEFAULT_CONFIG,
+        enabled: true,
+        enabledProviders: ["openai"],
+        showOnQuestion: false,
+        showSessionTokens: false,
+        percentDisplayMode: "used",
+        percentLabelStyle: "bare",
+        ...(resetTimeSpaced === undefined ? {} : { resetTimeSpaced }),
+        minIntervalMs: 60_000,
+      });
+
+      const provider = {
+        id: "openai",
+        isAvailable: vi.fn().mockResolvedValue(true),
+        fetch: vi.fn().mockResolvedValue({
+          attempted: true,
+          entries: [
+            {
+              accounting: TEST_ACCOUNTING,
+              name: "OpenAI Pro",
+              percentRemaining: 81,
+              resetTimeIso: "2026-01-17T15:14:00.000Z",
+            },
+          ],
+          errors: [],
+        }),
+      };
+      mocks.getProviders.mockReturnValue([provider]);
+
+      const { QuotaToastPlugin } = await import("../src/plugin.js");
+      const client = createClient();
+      await QuotaToastPlugin({ client } as any);
+
+      const injected = await buildDialogOutput({
+        client,
+        sessionID: "session-quota-display-options",
+      });
+      expect(injected).toContain("Quota [Used] (/quota)");
+      expect(injected).toContain("19%");
+      expect(injected).not.toContain("19% used");
+      expect(injected).toContain(expectedReset);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("rewrites default_agent only when one zero-width-normalized key matches", async () => {
     const { QuotaToastPlugin } = await import("../src/plugin.js");
     const hooks = await QuotaToastPlugin({ client: createClient() } as any);

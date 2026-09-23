@@ -7,6 +7,7 @@ import {
   TUI_SIDEBAR_LAYOUT,
   TUI_SIDEBAR_MAX_WIDTH,
 } from "../src/lib/tui-sidebar-format.js";
+import { DEFAULT_CONFIG } from "../src/lib/types.js";
 
 describe("buildSidebarQuotaPanelLines", () => {
   afterEach(() => {
@@ -342,7 +343,7 @@ describe("buildSidebarQuotaPanelLines", () => {
       },
     });
 
-    expect(lines.join("\n")).toContain("2h 14m");
+    expect(lines.join("\n")).toContain("2h14m");
     expect(lines.join("\n")).not.toContain("2.5h");
   });
 
@@ -630,5 +631,47 @@ describe("buildSidebarQuotaPanelLines", () => {
 
     expect(used).toEqual(remaining);
     expect(used.join("\n")).toContain("$2.40 / $20.00");
+  });
+
+  it("applies default spaced resets and bare labels within the 36-column sidebar", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T10:00:00.000Z"));
+    const data = {
+      entries: [
+        {
+          name: "OpenAI Account With A Long Label Weekly",
+          group: "OpenAI Account With A Long Label",
+          label: "Weekly:",
+          percentRemaining: 81,
+          resetTimeIso: "2026-01-17T15:14:00.000Z",
+        },
+      ],
+      errors: [],
+      sessionTokens: undefined,
+    };
+
+    for (const formatStyle of ["singleWindow", "allWindows"] as const) {
+      const full = buildSidebarQuotaPanelLines({
+        data,
+        config: { formatStyle, percentDisplayMode: "remaining" },
+      });
+      const bare = buildSidebarQuotaPanelLines({
+        data,
+        config: {
+          formatStyle,
+          percentDisplayMode: "remaining",
+          percentLabelStyle: "bare",
+          resetTimeSpaced: DEFAULT_CONFIG.resetTimeSpaced,
+        },
+      });
+      const barCells = (lines: string[]) =>
+        lines.find((line) => line.includes("█"))?.match(/[█░]/gu)?.length ?? 0;
+
+      expect(bare.join("\n")).toContain("81%");
+      expect(bare.join("\n")).not.toContain("81% left");
+      expect(bare.join("\n")).toContain("2d 5h 14m");
+      expect(barCells(bare)).toBe(barCells(full) + " left".length);
+      expect(bare.every((line) => line.length <= TUI_SIDEBAR_MAX_WIDTH)).toBe(true);
+    }
   });
 });

@@ -141,6 +141,18 @@ export const QUOTA_PROVIDER_REGISTRATION_SOURCE = [
     },
   },
   {
+    id: "alibaba-token-plan",
+    label: "Alibaba Personal Token Plan",
+    runtimeIds: ["alibaba-token-plan"],
+    synonyms: [],
+    shape: {
+      autoSetup: "needs_quick_setup",
+      authentication: "local_cli_auth",
+      quota: "local_cli_report",
+      quickSetupAnchor: "alibaba-personal-token-plan",
+    },
+  },
+  {
     id: "synthetic",
     label: "Synthetic",
     runtimeIds: ["synthetic"],
@@ -359,8 +371,7 @@ export const QUOTA_PROVIDER_REGISTRATION_SOURCE = [
       authentication: "opencode_auth_api_key",
       authFallbacks: ["env_api_key", "global_opencode_config"],
       quota: "remote_api",
-      notes:
-        "Queries the Ollama Cloud usage API; reports session and weekly quota plus model request counts",
+      notes: "Queries the Ollama Cloud usage API; reports session and weekly usage fractions",
     },
   },
   {

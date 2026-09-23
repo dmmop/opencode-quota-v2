@@ -527,7 +527,7 @@ describe("tui runtime helpers", () => {
       sessionID: "session-grouped",
     });
 
-    expect(panel).toEqual({ status: "ready", lines: ["[Copilot] (business)"] });
+    expect(panel).toEqual({ status: "ready", lines: ["[Copilot] (business)"], providerCount: 1 });
     expect(collectQuotaRenderData).toHaveBeenCalledWith(
       expect.objectContaining({
         formatStyle: "allWindows",
@@ -591,7 +591,11 @@ describe("tui runtime helpers", () => {
       sessionID: "session-weekly-grouped",
     });
 
-    expect(panel).toEqual({ status: "ready", lines: ["[Synthetic]", "Weekly window"] });
+    expect(panel).toEqual({
+      status: "ready",
+      lines: ["[Synthetic]", "Weekly window"],
+      providerCount: 1,
+    });
     expect(buildSidebarQuotaPanelLines).toHaveBeenCalledWith({
       data: weeklyData,
       config: expect.objectContaining({
@@ -1296,9 +1300,10 @@ describe("tui runtime helpers", () => {
       compact: { status: "ready", text: "Compact quota" },
       promptBar: {
         status: "ready",
-        entry: { name: "Copilot 5h", percentRemaining: 18 },
+        entry: { identityLabel: "Copilot 5h", name: "Copilot 5h", percentRemaining: 18 },
         percentDisplayMode: "used",
         resetTimeDecimals: undefined,
+        resetTimeSpaced: true,
       },
     });
     expect(collectQuotaRenderData).toHaveBeenCalledOnce();
@@ -1307,6 +1312,7 @@ describe("tui runtime helpers", () => {
       data,
       percentDisplayMode: "used",
       accountingDetail: "summary",
+      resetTimeSpaced: true,
       maxWidth: 42,
     });
   });
@@ -1414,12 +1420,14 @@ describe("tui runtime helpers", () => {
       promptBar: {
         status: "ready",
         entry: {
+          identityLabel: "Copilot 5h",
           name: "Copilot 5h",
           percentRemaining: 72,
           resetTimeIso: "2026-08-09T12:00:00Z",
         },
         percentDisplayMode: "used",
         resetTimeDecimals: 2,
+        resetTimeSpaced: true,
       },
     });
     expect(collectQuotaRenderData).toHaveBeenCalledOnce();
@@ -1468,9 +1476,150 @@ describe("tui runtime helpers", () => {
 
     expect(surfaces.promptBar).toEqual({
       status: "ready",
-      entry: { name: "Copilot monthly", percentRemaining: 18 },
+      entry: {
+        identityLabel: "Copilot Monthly",
+        name: "Copilot monthly",
+        percentRemaining: 18,
+      },
       percentDisplayMode: "remaining",
       resetTimeDecimals: undefined,
+      resetTimeSpaced: true,
+    });
+  });
+
+  it("prefers OpenCode Go 5h on the prompt bar when a sibling window is exhausted", async () => {
+    writeFileSync(
+      join(worktreeDir, "opencode.json"),
+      JSON.stringify({
+        experimental: {
+          quotaToast: {
+            enabled: true,
+            tuiSidebarPanel: { enabled: false },
+            tuiCompactStatus: { enabled: false },
+            tuiPromptBar: { enabled: true },
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    collectQuotaRenderData.mockResolvedValue({
+      active: [],
+      data: {
+        entries: [
+          {
+            name: "OpenCode Go 5h",
+            group: "OpenCode Go",
+            label: "5h:",
+            percentRemaining: 83,
+          },
+          {
+            name: "OpenCode Go Weekly",
+            group: "OpenCode Go",
+            label: "Weekly:",
+            percentRemaining: 0,
+          },
+          {
+            name: "OpenCode Go Monthly",
+            group: "OpenCode Go",
+            label: "Monthly:",
+            percentRemaining: 9,
+          },
+        ],
+        errors: [],
+        sessionTokens: undefined,
+      },
+    });
+
+    const surfaces = await loadTuiSessionQuotaSurfaces({
+      api: {
+        state: {
+          provider: [],
+          path: { worktree: worktreeDir, directory: nestedDir },
+          session: { messages: () => [] },
+        },
+        client: {},
+      } as any,
+      sessionID: "prompt-bar-opencode-go-exhausted",
+    });
+
+    expect(surfaces.promptBar).toEqual({
+      status: "ready",
+      entry: {
+        identityLabel: "OpenCode Go 5h",
+        name: "OpenCode Go 5h",
+        group: "OpenCode Go",
+        label: "5h:",
+        percentRemaining: 83,
+      },
+      percentDisplayMode: "remaining",
+      resetTimeDecimals: undefined,
+      resetTimeSpaced: true,
+    });
+  });
+
+  it("selects the exhausted OpenCode Go window on the prompt bar when 5h is filtered out", async () => {
+    writeFileSync(
+      join(worktreeDir, "opencode.json"),
+      JSON.stringify({
+        experimental: {
+          quotaToast: {
+            enabled: true,
+            tuiSidebarPanel: { enabled: false },
+            tuiCompactStatus: { enabled: false },
+            tuiPromptBar: { enabled: true },
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    collectQuotaRenderData.mockResolvedValue({
+      active: [],
+      data: {
+        entries: [
+          {
+            name: "OpenCode Go Weekly",
+            group: "OpenCode Go",
+            label: "Weekly:",
+            percentRemaining: 0,
+          },
+          {
+            name: "OpenCode Go Monthly",
+            group: "OpenCode Go",
+            label: "Monthly:",
+            percentRemaining: 9,
+          },
+        ],
+        errors: [],
+        sessionTokens: undefined,
+      },
+    });
+
+    const surfaces = await loadTuiSessionQuotaSurfaces({
+      api: {
+        state: {
+          provider: [],
+          path: { worktree: worktreeDir, directory: nestedDir },
+          session: { messages: () => [] },
+        },
+        client: {},
+      } as any,
+      sessionID: "prompt-bar-opencode-go-selected",
+    });
+
+    expect(surfaces.promptBar).toEqual({
+      status: "ready",
+      entry: {
+        identityLabel: "OpenCode Go Weekly",
+        name: "OpenCode Go Weekly",
+        group: "OpenCode Go",
+        label: "Weekly:",
+        percentRemaining: 0,
+      },
+      percentDisplayMode: "remaining",
+      resetTimeDecimals: undefined,
+      resetTimeSpaced: true,
     });
   });
 
@@ -1553,6 +1702,7 @@ describe("tui runtime helpers", () => {
       entry: { semanticSegment: fixture.expected },
       percentDisplayMode: "remaining",
       resetTimeDecimals: undefined,
+      resetTimeSpaced: true,
     });
   });
 
@@ -1617,13 +1767,14 @@ describe("tui runtime helpers", () => {
     });
 
     expect(surfaces).toEqual({
-      sidebar: { status: "ready", lines: ["Sidebar quota"] },
+      sidebar: { status: "ready", lines: ["Sidebar quota"], providerCount: 1 },
       compact: { status: "ready", text: "Compact quota" },
       promptBar: {
         status: "ready",
-        entry: { name: "Copilot 5h", percentRemaining: 18 },
+        entry: { identityLabel: "Copilot 5h", name: "Copilot 5h", percentRemaining: 18 },
         percentDisplayMode: "used",
         resetTimeDecimals: undefined,
+        resetTimeSpaced: true,
       },
     });
     expect(collectQuotaRenderData).toHaveBeenCalledOnce();
@@ -1653,6 +1804,93 @@ describe("tui runtime helpers", () => {
       data,
       percentDisplayMode: "used",
       accountingDetail: "summary",
+      resetTimeSpaced: true,
+      maxWidth: 42,
+    });
+  });
+
+  it.each([
+    { label: "default spaced resets", resetTimeSpaced: undefined, expectedResetTimeSpaced: true },
+    {
+      label: "the explicit dense-reset opt-out",
+      resetTimeSpaced: false,
+      expectedResetTimeSpaced: false,
+    },
+  ])("forwards $label and bare labels to TUI quota displays", async ({
+    resetTimeSpaced,
+    expectedResetTimeSpaced,
+  }) => {
+    writeFileSync(
+      join(worktreeDir, "opencode.json"),
+      JSON.stringify({
+        experimental: {
+          quotaToast: {
+            enabled: true,
+            percentDisplayMode: "used",
+            percentLabelStyle: "bare",
+            ...(resetTimeSpaced === undefined ? {} : { resetTimeSpaced }),
+            tuiCompactStatus: {
+              enabled: true,
+              sessionPrompt: true,
+              maxWidth: 42,
+            },
+            tuiPromptBar: { enabled: true },
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const data = {
+      entries: [
+        {
+          name: "Copilot 5h",
+          percentRemaining: 18,
+          resetTimeIso: "2026-01-15T13:45:00.000Z",
+        },
+      ],
+      errors: [],
+      sessionTokens: undefined,
+    };
+    collectQuotaRenderData.mockResolvedValue({ active: [], data });
+    buildSidebarQuotaPanelLines.mockReturnValue(["Sidebar quota"]);
+    buildCompactQuotaStatusLine.mockReturnValue("Compact quota");
+
+    const surfaces = await loadTuiSessionQuotaSurfaces({
+      api: {
+        state: {
+          provider: [],
+          path: { worktree: worktreeDir, directory: nestedDir },
+          session: { messages: () => [] },
+        },
+        client: {},
+      } as any,
+      sessionID: `spacing-${expectedResetTimeSpaced}`,
+    });
+
+    expect(surfaces.sidebar).toEqual({
+      status: "ready",
+      lines: ["Sidebar quota"],
+      headerPercentMode: "used",
+      providerCount: 1,
+    });
+    expect(surfaces.promptBar).toMatchObject({
+      status: "ready",
+      percentDisplayMode: "used",
+      resetTimeSpaced: expectedResetTimeSpaced,
+    });
+    expect(buildSidebarQuotaPanelLines).toHaveBeenCalledWith({
+      data,
+      config: expect.objectContaining({
+        percentLabelStyle: "bare",
+        resetTimeSpaced: expectedResetTimeSpaced,
+      }),
+    });
+    expect(buildCompactQuotaStatusLine).toHaveBeenCalledWith({
+      data,
+      percentDisplayMode: "used",
+      accountingDetail: "summary",
+      resetTimeSpaced: expectedResetTimeSpaced,
       maxWidth: 42,
     });
   });
@@ -1701,6 +1939,7 @@ describe("tui runtime helpers", () => {
         status: "ready",
         percentDisplayMode: "remaining",
         resetTimeDecimals: undefined,
+        resetTimeSpaced: true,
       },
     });
     expect(buildCompactQuotaStatusLine).not.toHaveBeenCalled();
@@ -1809,6 +2048,7 @@ describe("tui runtime helpers", () => {
       data,
       percentDisplayMode: "remaining",
       accountingDetail: "summary",
+      resetTimeSpaced: true,
       maxWidth: 96,
     });
   });
@@ -2187,6 +2427,7 @@ describe("tui runtime helpers", () => {
       data,
       percentDisplayMode: "used",
       accountingDetail: "summary",
+      resetTimeSpaced: true,
       maxWidth: 40,
     });
     expect(buildSidebarQuotaPanelLines).not.toHaveBeenCalled();
@@ -2382,6 +2623,7 @@ describe("tui runtime helpers", () => {
       status: "ready",
       lines: ["Copilot 50%"],
       linesExpanded: ["[Copilot]", "5h line", "Weekly line"],
+      providerCount: 2,
     });
     // collect still used root formatStyle=singleWindow
     expect(collectQuotaRenderData).toHaveBeenCalledWith(

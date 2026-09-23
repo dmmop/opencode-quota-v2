@@ -1,9 +1,9 @@
 <p align="center">
   <a href="https://github.com/slkiser/opencode-quota">
     <picture>
-      <source srcset="opencode-quota-logo-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="opencode-quota-logo-light.svg" media="(prefers-color-scheme: light)">
-      <img src="opencode-quota-logo-light.svg" alt="OpenCode Quota logo">
+      <source srcset="https://shawnkiser.com/opencode-quota/opencode-quota-logo-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="https://shawnkiser.com/opencode-quota/opencode-quota-logo-light.svg" media="(prefers-color-scheme: light)">
+      <img src="https://shawnkiser.com/opencode-quota/opencode-quota-logo-light.svg" alt="OpenCode Quota logo">
     </picture>
   </a>
 </p>
@@ -89,7 +89,8 @@ More ways to use it:
 
 - Check quota anywhere: use `opencode-quota show` in a terminal or the same slash commands in the TUI, Web, and Desktop.
 - Automate quota checks with JSON output for scripts, status bars, and CI. Optional OpenTelemetry metrics support monitoring tools.
-- Customize the display with [`tuiPromptBar.enabled`](docs/readme/configuration.md#tui-settings), OpenCode Go's preferred collapsed-sidebar window, reset precision, and [`accountingDetail`](docs/readme/configuration.md#show-accounting-detail).
+- Customize the display with [`tuiPromptBar.enabled`](docs/readme/configuration.md#tui-settings), OpenCode Go's preferred collapsed-sidebar window, spaced reset countdowns by default with a `resetTimeSpaced: false` dense opt-out, decimal reset precision, bare percent labels, and [`accountingDetail`](docs/readme/configuration.md#show-accounting-detail).
+- Optionally estimate **Runs out ≈ 1h 50m** for supported fixed windows with [`quotaProjection: "runway"`](docs/readme/configuration.md#estimate-when-fixed-quota-runs-out). It is off by default and leaves JSON output unchanged.
 - Choose current-session or descendant-tree token totals. Get reset popups for selected windows with [`resetNotifications`](docs/readme/configuration.md#notify-when-quota-becomes-available-again).
 - Troubleshoot authentication, quota sources, pricing, and maintainer notices.
 
@@ -183,17 +184,18 @@ Gemini CLI quota support is deprecated for new installs. Existing v4 configurati
 <details open>
 <summary><strong>Personal</strong></summary>
 
-| Provider                 | Auth/setup                                          | Data from      | Reports            |
-| ------------------------ | --------------------------------------------------- | -------------- | ------------------ |
-| Alibaba Coding Plan      | Automatic                                           | Local estimate | Quota              |
-| DeepSeek                 | Automatic                                           | Remote API     | Balance and status |
-| Kimi Code                | Automatic                                           | Remote API     | Quota              |
-| MiniMax Token Plan       | Automatic                                           | Remote API     | Quota              |
-| MiniMax Token Plan (CN)  | Automatic                                           | Remote API     | Quota              |
-| Qwen Code                | [Needs setup](docs/readme/providers.md#qwen-code)   | Local estimate | Quota              |
-| Xiaomi MiMo              | [Needs setup](docs/readme/providers.md#xiaomi-mimo) | Dashboard API  | Quota and balance  |
-| Z.ai Coding Plan         | Automatic                                           | Remote API     | Quota              |
-| Zhipu Coding Plan        | Automatic                                           | Remote API     | Quota              |
+| Provider                      | Auth/setup                                                                   | Data from      | Reports            |
+| ----------------------------- | ---------------------------------------------------------------------------- | -------------- | ------------------ |
+| Alibaba Coding Plan           | Automatic                                                                    | Local estimate | Quota              |
+| Alibaba Personal Token Plan   | [Needs setup](docs/readme/providers.md#alibaba-personal-token-plan)          | Official CLI   | Quota              |
+| DeepSeek                      | Automatic                                                                    | Remote API     | Balance and status |
+| Kimi Code                     | Automatic                                                                    | Remote API     | Quota              |
+| MiniMax Token Plan            | Automatic                                                                    | Remote API     | Quota              |
+| MiniMax Token Plan (CN)       | Automatic                                                                    | Remote API     | Quota              |
+| Qwen Code                     | [Needs setup](docs/readme/providers.md#qwen-code)                            | Local estimate | Quota              |
+| Xiaomi MiMo                   | [Needs setup](docs/readme/providers.md#xiaomi-mimo)                          | Dashboard API  | Quota and balance  |
+| Z.ai Coding Plan              | Automatic                                                                    | Remote API     | Quota              |
+| Zhipu Coding Plan             | Automatic                                                                    | Remote API     | Quota              |
 
 </details>
 
@@ -268,4 +270,4 @@ OpenCode Quota is not built by the OpenCode team and is not affiliated with Open
 
 ## Star history
 
-![Star History Chart](https://shawnkiser.com/opencode-quota/star-history-2026813.svg)
+[![Star History Chart](https://api.star-history.com/svg?repos=slkiser/opencode-quota&type=date&legend=top-left)](https://www.star-history.com/#slkiser/opencode-quota&Date)

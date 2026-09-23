@@ -7,15 +7,17 @@ import type { QuotaToastEntry, QuotaToastError, SessionTokensData } from "./entr
 import { isPercentEntry } from "./entries.js";
 import {
   bar,
-  DISPLAYED_PERCENT_LABEL_WIDTH,
+  displayedPercentLabelWidth,
   formatDisplayedPercentLabel,
   formatResetCountdown,
   isResetTimeDecimals,
   padLeft,
   padRight,
   resolveDisplayedPercent,
+  wrapDisplayText,
 } from "./format-utils.js";
 import { buildSingleWindowPercentEntryDisplayName } from "./quota-entry-display.js";
+import { formatQuotaRunway } from "./quota-exhaustion-projection.js";
 import type { QuotaFormatStyle } from "./quota-format-style.js";
 import { getQuotaFormatStyleDefinition } from "./quota-format-style.js";
 import {
@@ -100,8 +102,11 @@ export function formatQuotaRows(params: {
   errors?: QuotaToastError[];
   style?: QuotaFormatStyle;
   percentDisplayMode?: QuotaToastConfig["percentDisplayMode"];
+  percentLabelStyle?: QuotaToastConfig["percentLabelStyle"];
   accountingDetail?: QuotaToastConfig["accountingDetail"];
   resetTimeDecimals?: number;
+  resetTimeSpaced?: boolean;
+  wrapLabels?: boolean;
   sessionTokens?: SessionTokensData;
 }): string {
   const styleDefinition = getQuotaFormatStyleDefinition(params.style);
@@ -112,8 +117,11 @@ export function formatQuotaRows(params: {
       entries: params.entries,
       errors: params.errors,
       percentDisplayMode: params.percentDisplayMode,
+      percentLabelStyle: params.percentLabelStyle,
       accountingDetail: params.accountingDetail,
       resetTimeDecimals: params.resetTimeDecimals,
+      resetTimeSpaced: params.resetTimeSpaced,
+      wrapLabels: params.wrapLabels,
       sessionTokens: params.sessionTokens,
     });
   }
@@ -130,12 +138,16 @@ export function formatQuotaRows(params: {
 
   const separator = "  ";
   const percentCol = Math.max(
-    DISPLAYED_PERCENT_LABEL_WIDTH,
+    displayedPercentLabelWidth(params.percentLabelStyle),
     ...(params.entries ?? [])
       .filter(isPercentEntry)
       .map(
         (entry) =>
-          formatDisplayedPercentLabel(entry.percentRemaining, params.percentDisplayMode).length,
+          formatDisplayedPercentLabel(
+            entry.percentRemaining,
+            params.percentDisplayMode,
+            params.percentLabelStyle,
+          ).length,
       ),
   );
 
@@ -155,9 +167,14 @@ export function formatQuotaRows(params: {
     resetIso: string | undefined,
     remaining: number,
     rightSummary?: string,
+    runway?: string,
   ) => {
     const displayedPercent = resolveDisplayedPercent(remaining, params.percentDisplayMode);
-    const percentLabel = formatDisplayedPercentLabel(remaining, params.percentDisplayMode);
+    const percentLabel = formatDisplayedPercentLabel(
+      remaining,
+      params.percentDisplayMode,
+      params.percentLabelStyle,
+    );
     const visibleBarSuffix = percentLabel.slice(0, percentValueCol);
     const summary = rightSummary?.trim() || "";
     const leftText = summary ? `${name} ${summary}` : name;
@@ -174,7 +191,7 @@ export function formatQuotaRows(params: {
                   compactRounded: true,
                   decimals: params.resetTimeDecimals,
                 }
-              : { missing: "-" },
+              : { missing: "-", spaced: params.resetTimeSpaced },
           )
         : "";
 
@@ -191,12 +208,16 @@ export function formatQuotaRows(params: {
         padLeft(visibleBarSuffix, percentValueCol),
       ].join(separator);
       lines.push(line.slice(0, maxWidth));
+      if (runway) lines.push(`Runs out  ${runway}`.slice(0, maxWidth));
       return;
     }
 
     // Line 1: label + time can use the full available width. Prefer keeping the
     // reset text aligned, but shrink padding before truncating labels that fit.
-    if (
+    if (params.wrapLabels && leftText.length > maxWidth) {
+      lines.push(...wrapDisplayText(leftText, maxWidth));
+      if (timeStr) lines.push(padLeft(timeStr, maxWidth));
+    } else if (
       timeStr &&
       leftText.length <= maxWidth &&
       leftText.length + separator.length + timeStr.length > maxWidth
@@ -220,6 +241,7 @@ export function formatQuotaRows(params: {
     const suffixCell = padLeft(visibleBarSuffix, percentValueCol);
     const barLine = [barCell, suffixCell].join(separator);
     lines.push(barLine);
+    if (runway) lines.push(`Runs out  ${runway}`.slice(0, maxWidth));
   };
 
   const addValueEntry = (
@@ -239,7 +261,7 @@ export function formatQuotaRows(params: {
                   compactRounded: true,
                   decimals: params.resetTimeDecimals,
                 }
-              : { missing: "-" },
+              : { missing: "-", spaced: params.resetTimeSpaced },
           );
 
     if (atomicValue) {
@@ -367,6 +389,7 @@ export function formatQuotaRows(params: {
         entry.resetTimeIso,
         interpretation.display.percentRemaining,
         entry.right,
+        isPercentEntry(entry) ? formatQuotaRunway(entry.runway) : "",
       );
       addBasisLine(interpretation.basis);
     }

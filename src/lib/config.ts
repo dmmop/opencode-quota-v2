@@ -23,6 +23,7 @@ import type {
   CursorQuotaPlan,
   GoogleModelId,
   PercentDisplayMode,
+  PercentLabelStyle,
   PricingSnapshotSource,
   QuotaResetWindow,
   QuotaToastConfig,
@@ -45,8 +46,11 @@ export const QUOTA_TOAST_SETTING_SOURCE_KEYS = [
   "tuiCommandDisplay",
   "formatStyle",
   "percentDisplayMode",
+  "quotaProjection",
+  "percentLabelStyle",
   "accountingDetail",
   "resetTimeDecimals",
+  "resetTimeSpaced",
   "minIntervalMs",
   "requestTimeoutMs",
   "debug",
@@ -157,8 +161,11 @@ type ValidatedQuotaToastPatch = {
   tuiCommandDisplay?: TuiCommandDisplay;
   formatStyle?: QuotaToastConfig["formatStyle"];
   percentDisplayMode?: PercentDisplayMode;
+  quotaProjection?: "runway";
+  percentLabelStyle?: PercentLabelStyle;
   accountingDetail?: QuotaToastConfig["accountingDetail"];
   resetTimeDecimals?: number;
+  resetTimeSpaced?: boolean;
   minIntervalMs?: number;
   requestTimeoutMs?: number;
   debug?: boolean;
@@ -243,6 +250,10 @@ function isValidPricingSnapshotAutoRefresh(value: unknown): value is number {
 
 function isValidPercentDisplayMode(value: unknown): value is PercentDisplayMode {
   return value === "remaining" || value === "used";
+}
+
+function isValidPercentLabelStyle(value: unknown): value is PercentLabelStyle {
+  return value === "full" || value === "bare";
 }
 
 function isValidAccountingDetail(value: unknown): value is QuotaToastConfig["accountingDetail"] {
@@ -677,6 +688,21 @@ function extractValidatedQuotaToastPatch(
     patch.percentDisplayMode = quotaToastConfig.percentDisplayMode;
   }
 
+  if (hasOwnKey(quotaToastConfig, "quotaProjection")) {
+    if (quotaToastConfig.quotaProjection === "runway") {
+      patch.quotaProjection = "runway";
+    } else {
+      reportIssue?.("quotaProjection", 'expected "runway"');
+    }
+  }
+
+  if (
+    hasOwnKey(quotaToastConfig, "percentLabelStyle") &&
+    isValidPercentLabelStyle(quotaToastConfig.percentLabelStyle)
+  ) {
+    patch.percentLabelStyle = quotaToastConfig.percentLabelStyle;
+  }
+
   if (hasOwnKey(quotaToastConfig, "accountingDetail")) {
     if (isValidAccountingDetail(quotaToastConfig.accountingDetail)) {
       patch.accountingDetail = quotaToastConfig.accountingDetail;
@@ -690,6 +716,13 @@ function extractValidatedQuotaToastPatch(
     isResetTimeDecimals(quotaToastConfig.resetTimeDecimals)
   ) {
     patch.resetTimeDecimals = quotaToastConfig.resetTimeDecimals;
+  }
+
+  if (
+    hasOwnKey(quotaToastConfig, "resetTimeSpaced") &&
+    typeof quotaToastConfig.resetTimeSpaced === "boolean"
+  ) {
+    patch.resetTimeSpaced = quotaToastConfig.resetTimeSpaced;
   }
 
   if (
@@ -947,6 +980,16 @@ function applyValidatedQuotaToastPatch(
     applySettingSource(settingSources, "percentDisplayMode", sourcePath);
   }
 
+  if (hasOwnKey(patch, "quotaProjection")) {
+    config.quotaProjection = patch.quotaProjection;
+    applySettingSource(settingSources, "quotaProjection", sourcePath);
+  }
+
+  if (hasOwnKey(patch, "percentLabelStyle")) {
+    config.percentLabelStyle = patch.percentLabelStyle;
+    applySettingSource(settingSources, "percentLabelStyle", sourcePath);
+  }
+
   if (hasOwnKey(patch, "accountingDetail")) {
     config.accountingDetail = patch.accountingDetail!;
     applySettingSource(settingSources, "accountingDetail", sourcePath);
@@ -955,6 +998,11 @@ function applyValidatedQuotaToastPatch(
   if (hasOwnKey(patch, "resetTimeDecimals")) {
     config.resetTimeDecimals = patch.resetTimeDecimals;
     applySettingSource(settingSources, "resetTimeDecimals", sourcePath);
+  }
+
+  if (hasOwnKey(patch, "resetTimeSpaced")) {
+    config.resetTimeSpaced = patch.resetTimeSpaced;
+    applySettingSource(settingSources, "resetTimeSpaced", sourcePath);
   }
 
   if (hasOwnKey(patch, "minIntervalMs")) {

@@ -1,4 +1,5 @@
 import { sanitizeSingleLineDisplayText } from "./display-sanitize.js";
+import type { AccountingMetadata, QuotaRunwayProjection } from "./entries.js";
 import type { PercentDisplayMode } from "./types.js";
 
 const SIDEBAR_LOADING_LINE = "Loading…";
@@ -12,6 +13,7 @@ export type SidebarPanelState = {
   lines: string[];
   linesExpanded?: string[];
   providerCount?: number;
+  headerPercentMode?: PercentDisplayMode;
 };
 
 export type CompactStatusState =
@@ -27,10 +29,15 @@ export type HomeBottomState =
 export type PromptBarEntry = {
   /** Preformatted primary semantic label/value segment for rich accounting rows. */
   semanticSegment?: string;
+  /** Provider plus window label for percentage rows, for example `OpenAI 5h`. */
+  identityLabel?: string;
   label?: string;
   name?: string;
+  group?: string;
   percentRemaining?: number;
   resetTimeIso?: string;
+  runway?: QuotaRunwayProjection;
+  accounting?: AccountingMetadata;
 };
 
 export type PromptBarState =
@@ -40,6 +47,7 @@ export type PromptBarState =
       entry?: PromptBarEntry;
       percentDisplayMode?: PercentDisplayMode;
       resetTimeDecimals?: number;
+      resetTimeSpaced?: boolean;
     };
 
 export function shouldRenderSidebarPanel(panel: SidebarPanelState): boolean {

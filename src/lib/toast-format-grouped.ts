@@ -10,17 +10,19 @@ import type { QuotaToastEntry, QuotaToastError, SessionTokensData } from "./entr
 import { isPercentEntry } from "./entries.js";
 import {
   bar,
-  DISPLAYED_PERCENT_LABEL_WIDTH,
+  displayedPercentLabelWidth,
   formatDisplayedPercentLabel,
   formatResetCountdown,
   isResetTimeDecimals,
   padLeft,
   padRight,
   resolveDisplayedPercent,
+  wrapDisplayText,
 } from "./format-utils.js";
 import { normalizeGroupedQuotaEntries } from "./grouped-entry-normalization.js";
 import { formatGroupedHeader } from "./grouped-header-format.js";
 import { classifyQuotaWindowText, type QuotaWindowKind } from "./quota-entry-display.js";
+import { formatQuotaRunway } from "./quota-exhaustion-projection.js";
 import { renderSessionTokensLines } from "./session-tokens-format.js";
 import type { QuotaToastConfig } from "./types.js";
 
@@ -73,8 +75,11 @@ export function formatQuotaRowsGrouped(params: {
   entries?: QuotaToastEntry[];
   errors?: QuotaToastError[];
   percentDisplayMode?: QuotaToastConfig["percentDisplayMode"];
+  percentLabelStyle?: QuotaToastConfig["percentLabelStyle"];
   accountingDetail?: QuotaToastConfig["accountingDetail"];
   resetTimeDecimals?: number;
+  resetTimeSpaced?: boolean;
+  wrapLabels?: boolean;
   sessionTokens?: SessionTokensData;
 }): string {
   const layout = params.layout ?? { maxWidth: 50, narrowAt: 42, tinyAt: 32 };
@@ -84,12 +89,16 @@ export function formatQuotaRowsGrouped(params: {
 
   const separator = "  ";
   const percentCol = Math.max(
-    DISPLAYED_PERCENT_LABEL_WIDTH,
+    displayedPercentLabelWidth(params.percentLabelStyle),
     ...(params.entries ?? [])
       .filter(isPercentEntry)
       .map(
         (entry) =>
-          formatDisplayedPercentLabel(entry.percentRemaining, params.percentDisplayMode).length,
+          formatDisplayedPercentLabel(
+            entry.percentRemaining,
+            params.percentDisplayMode,
+            params.percentLabelStyle,
+          ).length,
       ),
   );
   const percentValueCol = percentCol;
@@ -115,7 +124,12 @@ export function formatQuotaRowsGrouped(params: {
     const list = groups.get(g) ?? [];
     if (gi > 0) lines.push("");
 
-    lines.push(formatGroupedHeader(g).slice(0, maxWidth));
+    const groupHeader = formatGroupedHeader(g);
+    lines.push(
+      ...(params.wrapLabels
+        ? wrapDisplayText(groupHeader, maxWidth)
+        : [groupHeader.slice(0, maxWidth)]),
+    );
 
     for (const entry of list) {
       const interpretation = interpretAccountingRow(entry, {
@@ -142,7 +156,7 @@ export function formatQuotaRowsGrouped(params: {
               entry.resetTimeIso,
               isResetTimeDecimals(params.resetTimeDecimals)
                 ? { compactRounded: true, decimals: params.resetTimeDecimals }
-                : undefined,
+                : { spaced: params.resetTimeSpaced },
             )
           : "";
         const value =
@@ -229,6 +243,7 @@ export function formatQuotaRowsGrouped(params: {
       const percentLabel = formatDisplayedPercentLabel(
         interpretation.display.percentRemaining,
         params.percentDisplayMode,
+        params.percentLabelStyle,
       );
 
       // Percent entries
@@ -240,9 +255,13 @@ export function formatQuotaRowsGrouped(params: {
               entry.resetTimeIso,
               isResetTimeDecimals(params.resetTimeDecimals)
                 ? { compactRounded: true, decimals: params.resetTimeDecimals }
-                : undefined,
+                : { spaced: params.resetTimeSpaced },
             )
           : "";
+      const runway = isPercentEntry(entry) ? formatQuotaRunway(entry.runway) : "";
+      const addRunwayLine = () => {
+        if (runway) lines.push(`Runs out  ${runway}`.slice(0, maxWidth));
+      };
 
       if (isTiny) {
         // Tiny: single line with name/time/percent (or just the right summary)
@@ -259,6 +278,7 @@ export function formatQuotaRowsGrouped(params: {
             padLeft(visibleBarSuffix, percentValueCol),
           ].join(separator);
           lines.push(line.slice(0, maxWidth));
+          addRunwayLine();
           continue;
         }
         const tinyNameCol = Math.max(
@@ -271,6 +291,7 @@ export function formatQuotaRowsGrouped(params: {
           padLeft(visibleBarSuffix, percentValueCol),
         ].join(separator);
         lines.push(line.slice(0, maxWidth));
+        addRunwayLine();
         continue;
       }
 
@@ -301,6 +322,7 @@ export function formatQuotaRowsGrouped(params: {
       const barCell = bar(displayedPercent, barWidth);
       const suffixCell = padLeft(percentLabel.slice(0, percentValueCol), percentValueCol);
       lines.push([barCell, suffixCell].join(separator));
+      addRunwayLine();
 
       if (interpretation.basis) {
         const candidates =

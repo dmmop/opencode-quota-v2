@@ -22,6 +22,7 @@ export type GoogleAgyAuthSourceKey = "google-agy" | "opencode-agy-auth" | "googl
 export type CursorQuotaPlan = "none" | "pro" | "pro-plus" | "ultra";
 export type PricingSnapshotSource = "auto" | "bundled" | "runtime";
 export type PercentDisplayMode = "remaining" | "used";
+export type PercentLabelStyle = "full" | "bare";
 export type AccountingDetail = "summary" | "detailed";
 export type SessionTokenScope = "current" | "tree";
 export type OpenCodeGoWindowKey = "rolling" | "weekly" | "monthly";
@@ -112,13 +113,19 @@ export interface QuotaToastConfig {
   formatStyle: QuotaFormatStyle;
   /** Shared percent meaning for popup toasts and the TUI sidebar. */
   percentDisplayMode: PercentDisplayMode;
+  /** Optional fixed-window quota exhaustion projection. Unset keeps it disabled. */
+  quotaProjection?: "runway";
+  /** Optional suffix style for percentage labels. Unset preserves full labels. */
+  percentLabelStyle?: PercentLabelStyle;
   /** Whether human surfaces include supplementary semantic accounting rows. */
   accountingDetail: AccountingDetail;
   /**
    * Decimal places for a largest-unit reset countdown override.
-   * Unset uses the default exact-to-minute DdHhMm display.
+   * Unset uses the default exact-to-minute days, hours, and minutes display.
    */
   resetTimeDecimals?: number;
+  /** Whether exact multi-unit reset countdowns include spaces between units. Defaults to true. */
+  resetTimeSpaced?: boolean;
   minIntervalMs: number;
 
   /** Request timeout in milliseconds for remote provider API calls. */
@@ -228,6 +235,7 @@ export const DEFAULT_CONFIG: QuotaToastConfig = {
   formatStyle: DEFAULT_QUOTA_FORMAT_STYLE,
   percentDisplayMode: "remaining",
   accountingDetail: "summary",
+  resetTimeSpaced: true,
   minIntervalMs: 300000, // 5 minutes
   requestTimeoutMs: REQUEST_TIMEOUT_MS,
 
@@ -869,12 +877,6 @@ export interface OllamaCloudWindow {
   percentRemaining: number;
 }
 
-/** Per-model request count from the Ollama Cloud usage API */
-export interface OllamaCloudModelUsage {
-  model: string;
-  requests: number;
-}
-
 /** Result from the Ollama Cloud usage API */
 export type OllamaCloudResult =
   | {
@@ -883,9 +885,7 @@ export type OllamaCloudResult =
       session?: OllamaCloudWindow;
       /** Weekly usage window, when present */
       weekly?: OllamaCloudWindow;
-      /** Valid per-model request counts */
-      models: OllamaCloudModelUsage[];
-      /** Independent response rows that could not be used */
+      /** Independent response fields that could not be used */
       rowErrors?: string[];
     }
   | QuotaError
