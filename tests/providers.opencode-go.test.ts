@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   resolveOpenCodeGoAuth: vi.fn(),
   getOpenCodeGoAuthDiagnostics: vi.fn(),
   queryOpenCodeGoQuota: vi.fn(),
+  queryOpenCodeGoConsoleStatus: vi.fn(),
   readLegacyAuthRows: vi.fn(async () => []),
+  resolveOpenCodeConsoleAuth: vi.fn(),
 }));
 
 vi.mock("../src/lib/opencode-go-auth.js", () => ({
@@ -24,8 +26,18 @@ vi.mock("../src/lib/opencode-go-auth.js", () => ({
   resolveOpenCodeGoAuth: mocks.resolveOpenCodeGoAuth,
 }));
 
-vi.mock("../src/lib/opencode-go.js", () => ({
-  queryOpenCodeGoQuota: mocks.queryOpenCodeGoQuota,
+vi.mock("../src/lib/opencode-go.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../src/lib/opencode-go.js")>();
+  return {
+    ...original,
+    queryOpenCodeGoQuota: mocks.queryOpenCodeGoQuota,
+    queryOpenCodeGoConsoleStatus: mocks.queryOpenCodeGoConsoleStatus,
+  };
+});
+
+vi.mock("../src/lib/opencode-console-auth.js", () => ({
+  OPENCODE_CONSOLE_BASE_URL: "https://opencode.ai/console",
+  resolveOpenCodeConsoleAuth: mocks.resolveOpenCodeConsoleAuth,
 }));
 
 vi.mock("../src/lib/opencode-auth.js", async (importOriginal) => ({
@@ -97,6 +109,102 @@ describe("opencode-go provider", () => {
     });
     mocks.queryOpenCodeGoQuota.mockResolvedValue(successfulResult());
     mocks.resolveOpenCodeGoAuth.mockReturnValue({ state: "configured", apiKey: "row-token" });
+    mocks.readLegacyAuthRows.mockResolvedValue([]);
+    mocks.resolveOpenCodeConsoleAuth.mockResolvedValue({ state: "none" });
+  });
+
+  function consoleConfigured(): void {
+    mocks.resolveOpenCodeConsoleAuth.mockResolvedValueOnce({
+      state: "configured",
+      credential: { accessToken: "console-access", orgId: "wrk_1" },
+    });
+  }
+
+  function consoleSuccess(): void {
+    mocks.queryOpenCodeGoConsoleStatus.mockResolvedValueOnce({
+      success: true,
+      rolling: {
+        status: "ok",
+        usagePercent: 0,
+        percentRemaining: 100,
+        resetTimeIso: "2026-09-23T18:59:07.061Z",
+      },
+      weekly: {
+        status: "ok",
+        usagePercent: 27,
+        percentRemaining: 73,
+        resetTimeIso: "2026-09-28T00:00:00.000Z",
+      },
+      monthly: {
+        status: "rate-limited",
+        usagePercent: 100,
+        percentRemaining: 0,
+        resetTimeIso: "2026-10-02T12:48:59.000Z",
+      },
+    });
+  }
+
+  it("reads Go windows from the console API when a console credential exists", async () => {
+    consoleConfigured();
+    consoleSuccess();
+
+    const out = await runFetch();
+
+    expect(mocks.queryOpenCodeGoConsoleStatus).toHaveBeenCalledWith(
+      { accessToken: "console-access", orgId: "wrk_1" },
+      { requestTimeoutMs: 5_000 },
+    );
+    expect(mocks.queryOpenCodeGoQuota).not.toHaveBeenCalled();
+    expect(out.statusDetails).toEqual(
+      expect.arrayContaining([
+        { key: "go_source", value: "console" },
+        { key: "console_server", value: "https://opencode.ai/console" },
+      ]),
+    );
+    const visible = visibleEntries(out.entries, "opencode-go");
+    expect(visible.map((entry) => entry.name)).toEqual([
+      "OpenCode Go 5h",
+      "OpenCode Go Weekly",
+      "OpenCode Go Monthly",
+    ]);
+  });
+
+  it("reports a console not-subscribed state without errors", async () => {
+    consoleConfigured();
+    mocks.queryOpenCodeGoConsoleStatus.mockResolvedValueOnce({
+      success: false,
+      error: "OpenCode Go subscription not found for this console account (404)",
+      notSubscribed: true,
+    });
+
+    const out = await runFetch();
+
+    expectAttemptedWithNoErrors(out);
+    expect(out.entries).toEqual([]);
+    expect(out.statusDetails).toEqual(
+      expect.arrayContaining([{ key: "opencode_go_state", value: "not_subscribed" }]),
+    );
+    expect(mocks.queryOpenCodeGoQuota).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the legacy key path when the console request fails", async () => {
+    consoleConfigured();
+    mocks.queryOpenCodeGoConsoleStatus.mockResolvedValueOnce({
+      success: false,
+      error: "OpenCode Console API error 500 (/api/go/status)",
+      retryable: true,
+    });
+
+    const out = await runFetch();
+
+    expect(mocks.queryOpenCodeGoConsoleStatus).toHaveBeenCalledOnce();
+    expect(mocks.queryOpenCodeGoQuota).toHaveBeenCalledOnce();
+    expect(out.statusDetails).toEqual(
+      expect.arrayContaining([
+        { key: "go_source", value: "legacy_key" },
+        { key: "console_error", value: "OpenCode Console API error 500 (/api/go/status)" },
+      ]),
+    );
   });
 
   it("returns not attempted for absent auth without calling the API", async () => {

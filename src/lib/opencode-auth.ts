@@ -115,16 +115,6 @@ export async function readAuthFile(): Promise<AuthData | null> {
   for (const row of rows) {
     if (!(row.integrationId in auth)) auth[row.integrationId] = row.value;
   }
-
-  // OpenCode's console migration removed workspace API keys from the
-  // credential database while the entry written by `opencode auth login`
-  // (pre-2.0) in auth.json can remain valid for key-based APIs. Fill in
-  // integrations that the database does not cover.
-  const legacy = await readLegacyAuthEntries();
-  for (const [integrationId, entry] of Object.entries(legacy ?? {})) {
-    if (!(integrationId in auth)) auth[integrationId] = entry;
-  }
-
   return Object.keys(auth).length > 0 ? (auth as AuthData) : null;
 }
 
