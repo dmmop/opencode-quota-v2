@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   resolveOpenCodeGoAuth: vi.fn(),
   getOpenCodeGoAuthDiagnostics: vi.fn(),
   queryOpenCodeGoQuota: vi.fn(),
+  readLegacyAuthRows: vi.fn(async () => []),
 }));
 
 vi.mock("../src/lib/opencode-go-auth.js", () => ({
@@ -30,6 +31,7 @@ vi.mock("../src/lib/opencode-go.js", () => ({
 vi.mock("../src/lib/opencode-auth.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/lib/opencode-auth.js")>()),
   readCredentialRows: vi.fn().mockResolvedValue([]),
+  readLegacyAuthRows: mocks.readLegacyAuthRows,
 }));
 
 import {
@@ -309,8 +311,40 @@ describe("opencode-go provider", () => {
     ]);
   });
 
-  it("falls back to legacy alias rows when no native opencode-go row exists", async () => {
-    const { readCredentialRows } = await import("../src/lib/opencode-auth.js");
+  it("uses the pre-2.0 auth.json workspace key after the console migration removes database rows", async () => {
+    mocks.readLegacyAuthRows.mockResolvedValueOnce([
+      {
+        id: "auth-json:opencode-go",
+        integrationId: "opencode-go",
+        label: "legacy",
+        active: true,
+        value: { type: "key", key: "legacy-workspace-key" },
+      },
+      {
+        id: "auth-json:opencode",
+        integrationId: "opencode",
+        label: "legacy",
+        active: true,
+        value: {
+          type: "oauth",
+          methodID: "server",
+          access: "console-token",
+          metadata: { orgID: "wrk_x" },
+        },
+      },
+    ]);
+    mocks.resolveOpenCodeGoAuth.mockReturnValue({ state: "configured", apiKey: "legacy-workspace-key" });
+
+    const out = await runFetch(["rolling", "weekly"]);
+
+    expect(mocks.queryOpenCodeGoQuota).toHaveBeenCalledOnce();
+    expect(visibleEntries(out.entries, "opencode-go").map((entry) => entry.group)).toEqual([
+      "[OpenCode Go legacy]*",
+      "[OpenCode Go legacy]*",
+    ]);
+  });
+
+  it("falls back to legacy alias rows when no native opencode-go row exists", async () => {    const { readCredentialRows } = await import("../src/lib/opencode-auth.js");
     (readCredentialRows as any).mockResolvedValueOnce([
       {
         id: "alias-row",

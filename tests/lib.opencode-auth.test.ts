@@ -173,17 +173,21 @@ describe("OpenCode auth reader", () => {
     ).toBeLessThan((await readCredentialRows()).findIndex((row) => row.id === "openai"));
   });
 
-  it("ignores legacy auth.json entries", async () => {
+  it("fills integrations missing from the database from legacy auth.json", async () => {
     const { dataDir } = await createCredentialDatabase();
     vi.stubEnv("XDG_DATA_HOME", join(dataDir, ".."));
     await writeFile(
       join(dataDir, "auth.json"),
-      JSON.stringify({ openai: { type: "oauth", access: "file-access" } }),
+      JSON.stringify({
+        openai: { type: "oauth", access: "file-access" },
+        "legacy-extra": { type: "key", key: "legacy-key" },
+      }),
     );
 
     await expect(readAuthFile()).resolves.toMatchObject({
       "github-copilot": { access: "copilot-access" },
       openai: { access: "openai-access" },
+      "legacy-extra": { key: "legacy-key" },
     });
   });
 });
