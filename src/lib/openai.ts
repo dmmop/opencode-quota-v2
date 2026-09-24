@@ -224,6 +224,18 @@ function getOpenAIOAuthEntry(
       continue;
     }
 
+    // OpenCode 2 console credentials live under the `opencode` integration as
+    // OAuth entries; they authorize Console APIs, not OpenAI.
+    if (sourceKey === "opencode") {
+      const consoleEntry = entry as OpenAIOAuthData & {
+        methodID?: unknown;
+        metadata?: { orgID?: unknown } | null;
+      };
+      if (consoleEntry.methodID === "server" || consoleEntry.metadata?.orgID != null) {
+        continue;
+      }
+    }
+
     const accessToken = typeof entry.access === "string" ? entry.access.trim() : "";
     if (accessToken) {
       return { sourceKey, entry, accessToken };

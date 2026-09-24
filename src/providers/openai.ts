@@ -44,8 +44,12 @@ export const openaiProvider: QuotaProvider = {
   },
 
   async fetch(ctx: QuotaProviderContext): Promise<QuotaProviderResult> {
-    const rows = (await readCredentialRows()).filter((row) =>
-      ["openai", "codex", "chatgpt", "opencode"].includes(row.integrationId),
+    // Console OAuth credentials under the `opencode` integration authorize
+    // Console APIs, not OpenAI; skip them silently.
+    const rows = (await readCredentialRows()).filter(
+      (row) =>
+        ["openai", "codex", "chatgpt", "opencode"].includes(row.integrationId) &&
+        !(row.integrationId === "opencode" && row.value.type === "oauth"),
     );
     const credentials = rows.flatMap((row) => {
       const auth = resolveOpenAIOAuth({ [row.integrationId]: row.value } as AuthData);
