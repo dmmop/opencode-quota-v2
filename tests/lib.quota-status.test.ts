@@ -1669,6 +1669,7 @@ cursor:
 minimax:
 minimax_china:
 kimi:
+kimi_cn:
 opencode_go:
 opencode_zen:
 xiaomi:

@@ -261,6 +261,10 @@ export interface InvalidAwareProviderApiKeyResolver<
 > {
   parseAuth: (auth: unknown) => InvalidAwareAuthResult;
   resolve: (params?: { maxAgeMs?: number }) => Promise<InvalidAwareAuthResult>;
+  resolveWithDiagnostics: (params?: { maxAgeMs?: number }) => Promise<{
+    auth: InvalidAwareAuthResult;
+    diagnostics: InvalidAwareAuthDiagnostics<Source, AuthSource>;
+  }>;
   diagnostics: (params?: {
     maxAgeMs?: number;
   }) => Promise<InvalidAwareAuthDiagnostics<Source, AuthSource>>;
@@ -351,33 +355,43 @@ function createInvalidAwareProviderApiKeyResolver<Source extends string, AuthSou
     };
   };
 
-  return {
-    parseAuth,
-    resolve: async (params) => (await resolveWithSource(params)).auth,
-    diagnostics: async (params) => {
-      const { auth, source } = await resolveWithSource(params);
-      const paths = {
-        checkedPaths: getApiKeyCheckedPaths({
-          envVarNames: config.envVars.map((envVar) => envVar.name),
-          getConfigCandidates: config.getConfigCandidates,
-        }),
-        credentialDatabasePaths: config.auth.getCredentialDatabasePaths(),
-      };
-      if (auth.state === "none") return { state: "none", source: null, ...paths };
-      if (auth.state === "invalid") {
-        return {
-          state: "invalid",
+  const resolveWithDiagnostics = async (params?: { maxAgeMs?: number }) => {
+    const { auth, source } = await resolveWithSource(params);
+    const paths = {
+      checkedPaths: getApiKeyCheckedPaths({
+        envVarNames: config.envVars.map((envVar) => envVar.name),
+        getConfigCandidates: config.getConfigCandidates,
+      }),
+      credentialDatabasePaths: config.auth.getCredentialDatabasePaths(),
+    };
+    if (auth.state === "none")
+      return { auth, diagnostics: { state: "none" as const, source: null, ...paths } };
+    if (auth.state === "invalid") {
+      return {
+        auth,
+        diagnostics: {
+          state: "invalid" as const,
           source: config.auth.authSource,
           error: auth.error,
           ...paths,
-        };
-      }
-      return {
-        state: "configured",
+        },
+      };
+    }
+    return {
+      auth,
+      diagnostics: {
+        state: "configured" as const,
         source: source ?? config.auth.authSource,
         ...paths,
-      };
-    },
+      },
+    };
+  };
+
+  return {
+    parseAuth,
+    resolve: async (params) => (await resolveWithSource(params)).auth,
+    resolveWithDiagnostics,
+    diagnostics: async (params) => (await resolveWithDiagnostics(params)).diagnostics,
   };
 }
 

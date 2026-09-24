@@ -39,23 +39,6 @@ type InvalidAwareDescriptor = ProviderApiKeyContractDescriptor<InvalidAwareApiKe
 
 const providers = [
   {
-    name: "Kimi",
-    displayName: "Kimi",
-    envVars: ["KIMI_API_KEY", "KIMI_CODE_API_KEY"],
-    providerKeys: ["kimi-for-coding", "kimi-code", "kimi"],
-    authKeys: ["kimi-for-coding", "kimi-code", "kimi"],
-    defaultCacheMaxAgeMs: 5_000,
-    load: async () => {
-      const module = await import("../src/lib/kimi-auth.js");
-      return {
-        parseAuth: module.resolveKimiAuth,
-        resolve: module.resolveKimiAuthCached,
-        diagnostics: module.getKimiAuthDiagnostics,
-        getConfigCandidates: module.getOpencodeConfigCandidatePaths,
-      };
-    },
-  },
-  {
     name: "Z.ai",
     displayName: "Z.ai",
     envVars: ["ZAI_API_KEY", "ZAI_CODING_PLAN_API_KEY"],
