@@ -10,7 +10,6 @@ import type {
 import {
   formatCredentialDisplayNames,
   readCredentialRows,
-  readLegacyAuthRows,
   selectConnectionCredentialRows,
 } from "../lib/opencode-auth.js";
 import {
@@ -209,12 +208,9 @@ async function fetchOpenCodeGoLegacy(
       // credential database (see resolveOpenCodeGoAuth). Alias rows must not
       // become additional connections: prefer native rows and collapse rows
       // holding the same credential (e.g. Zen + Go sharing a workspace key).
-      // OpenCode's console migration removed workspace API keys from the
-      // credential database while the key written by pre-2.0 `opencode auth
-      // login` (auth.json) can remain valid for the Go usage API. Console
-      // OAuth credentials cannot authorize this API and are skipped.
+      // Console OAuth credentials cannot authorize this API and are skipped.
       const credentialRows = selectConnectionCredentialRows(
-        [...(await readCredentialRows()), ...(await readLegacyAuthRows())]
+        (await readCredentialRows())
           .filter((row) =>
             OPENCODE_GO_CREDENTIAL_INTEGRATION_IDS.includes(row.integrationId),
           )

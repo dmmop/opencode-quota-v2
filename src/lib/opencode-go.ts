@@ -256,10 +256,14 @@ export async function queryOpenCodeGoConsoleStatus(
       timeoutMs: options.requestTimeoutMs,
       consume: async (response) => {
         if (!response.ok) {
-          if (response.status === 404 || response.status === 403) {
+          // 404 on this member-scoped route is read as "no Go subscription".
+          // 403 is kept ambiguous (it could be an access/permission issue on
+          // the console side rather than a subscription state), so callers
+          // fall back instead of showing a not-subscribed state.
+          if (response.status === 404) {
             return {
               success: false,
-              error: `OpenCode Go subscription not found for this console account (${response.status})`,
+              error: "OpenCode Go subscription not found for this console account (404)",
               notSubscribed: true,
             };
           }

@@ -118,41 +118,6 @@ export async function readAuthFile(): Promise<AuthData | null> {
   return Object.keys(auth).length > 0 ? (auth as AuthData) : null;
 }
 
-async function readLegacyAuthEntries(): Promise<AuthData | null> {
-  for (const path of getAuthPaths()) {
-    if (!existsSync(path)) continue;
-    try {
-      const { readFile } = await import("fs/promises");
-      const raw = await readFile(path, "utf8");
-      const parsed: unknown = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return parsed as AuthData;
-      }
-    } catch {
-      // Unreadable legacy files are ignored; the database remains the source.
-    }
-  }
-  return null;
-}
-
-/** Credential rows synthesized from the legacy auth.json file. */
-export async function readLegacyAuthRows(): Promise<CredentialRow[]> {
-  const legacy = await readLegacyAuthEntries();
-  if (!legacy) return [];
-  const rows: CredentialRow[] = [];
-  for (const [integrationId, entry] of Object.entries(legacy)) {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-    rows.push({
-      id: `auth-json:${integrationId}`,
-      integrationId,
-      label: "legacy",
-      active: true,
-      value: entry as Record<string, unknown>,
-    });
-  }
-  return rows;
-}
-
 export async function readCredentialRows(): Promise<CredentialRow[]> {
   return readCredentialRowsFromDatabases(getCredentialDatabasePaths());
 }

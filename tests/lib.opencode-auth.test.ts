@@ -11,7 +11,6 @@ import {
   getCredentialDatabasePaths,
   readAuthFile,
   readCredentialRows,
-  readLegacyAuthRows,
   selectConnectionCredentialRows,
 } from "../src/lib/opencode-auth.js";
 
@@ -186,24 +185,6 @@ describe("OpenCode auth reader", () => {
       "github-copilot": { access: "copilot-access" },
       openai: { access: "openai-access" },
     });
-  });
-
-  it("synthesizes legacy auth.json rows for providers that lost keys in the console migration", async () => {
-    const { dataDir } = await createCredentialDatabase();
-    vi.stubEnv("XDG_DATA_HOME", join(dataDir, ".."));
-    await writeFile(
-      join(dataDir, "auth.json"),
-      JSON.stringify({ "opencode-go": { type: "key", key: "workspace-key" } }),
-    );
-
-    const rows = await readLegacyAuthRows();
-    expect(rows).toEqual([
-      expect.objectContaining({
-        id: "auth-json:opencode-go",
-        integrationId: "opencode-go",
-        value: { type: "key", key: "workspace-key" },
-      }),
-    ]);
   });
 });
 
