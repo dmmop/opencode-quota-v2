@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
 const EXPECTED_TYPESCRIPT_VERSION = "7.0.2";
-const EXPECTED_PLUGIN_VERSION = "1.18.1";
+const EXPECTED_PLUGIN_VERSION = "2.0.15";
+const PLUGIN_PACKAGE = "@opencode/plugin";
 const EXPECTED_OPENTUI_SPECIFIER = "^0.5.10";
 const EXPECTED_OPENTUI_VERSION = "0.5.10";
 const EXPECTED_OPENTUI_PACKAGES = ["@opentui/core", "@opentui/solid"];
@@ -54,7 +55,7 @@ function hasTypeScriptPeerOverride(value) {
 }
 
 const configuredTypeScript = packageJson.devDependencies?.typescript;
-const configuredPlugin = packageJson.devDependencies?.["@opencode-ai/plugin"];
+const configuredPlugin = packageJson.devDependencies?.[PLUGIN_PACKAGE];
 if (configuredTypeScript !== EXPECTED_TYPESCRIPT_VERSION) {
   fail(
     `TypeScript must be pinned exactly to ${EXPECTED_TYPESCRIPT_VERSION}; package.json has ${String(configuredTypeScript)}.`,
@@ -62,7 +63,7 @@ if (configuredTypeScript !== EXPECTED_TYPESCRIPT_VERSION) {
 }
 if (configuredPlugin !== EXPECTED_PLUGIN_VERSION) {
   fail(
-    `@opencode-ai/plugin must be pinned exactly to ${EXPECTED_PLUGIN_VERSION}; package.json has ${String(configuredPlugin)}.`,
+    `${PLUGIN_PACKAGE} must be pinned exactly to ${EXPECTED_PLUGIN_VERSION}; package.json has ${String(configuredPlugin)}.`,
   );
 }
 for (const name of EXPECTED_OPENTUI_PACKAGES) {
@@ -122,21 +123,21 @@ for (const name of EXPECTED_OPENTUI_PACKAGES) {
   }
 }
 
-const lockedPlugin = rootImporter.devDependencies?.["@opencode-ai/plugin"];
+const lockedPlugin = rootImporter.devDependencies?.[PLUGIN_PACKAGE];
 if (
   lockedPlugin?.specifier !== EXPECTED_PLUGIN_VERSION ||
   (lockedPlugin?.version !== EXPECTED_PLUGIN_VERSION &&
     !lockedPlugin?.version?.startsWith(`${EXPECTED_PLUGIN_VERSION}(`))
 ) {
   fail(
-    `@opencode-ai/plugin lock mismatch: expected ${EXPECTED_PLUGIN_VERSION}, found ${String(lockedPlugin?.specifier)} and ${String(lockedPlugin?.version)}.`,
+    `${PLUGIN_PACKAGE} lock mismatch: expected ${EXPECTED_PLUGIN_VERSION}, found ${String(lockedPlugin?.specifier)} and ${String(lockedPlugin?.version)}.`,
   );
 }
 
 const packageKeys = Object.keys(lockfile.packages ?? {});
 const snapshotKeys = Object.keys(lockfile.snapshots ?? {});
 const expectedTypeScriptKey = `typescript@${EXPECTED_TYPESCRIPT_VERSION}`;
-const expectedPluginKey = `@opencode-ai/plugin@${EXPECTED_PLUGIN_VERSION}`;
+const expectedPluginKey = `${PLUGIN_PACKAGE}@${EXPECTED_PLUGIN_VERSION}`;
 
 if (!packageKeys.includes(expectedTypeScriptKey) || !snapshotKeys.includes(expectedTypeScriptKey)) {
   fail(`pnpm-lock.yaml must contain package and snapshot entries for ${expectedTypeScriptKey}.`);
@@ -186,5 +187,5 @@ console.warn(
   `Known unmet peer: ${bunPackageKey} declares typescript ${BUN_FFI_TYPESCRIPT_PEER}, while the root uses ${EXPECTED_TYPESCRIPT_VERSION}. This mismatch is intentionally not suppressed.`,
 );
 console.log(
-  `TypeScript ${EXPECTED_TYPESCRIPT_VERSION} and @opencode-ai/plugin ${EXPECTED_PLUGIN_VERSION} lock entries verified.`,
+  `TypeScript ${EXPECTED_TYPESCRIPT_VERSION} and ${PLUGIN_PACKAGE} ${EXPECTED_PLUGIN_VERSION} lock entries verified.`,
 );

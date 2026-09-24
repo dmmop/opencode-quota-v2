@@ -153,8 +153,8 @@ describe("package manifest compatibility", () => {
   });
 
   it("reflects the local OpenCode V2 plugin dependency override", () => {
-    expect(pkg.peerDependencies?.["@opencode/plugin"]).toBe("2.0.2");
-    expect(pkg.devDependencies?.["@opencode/plugin"]).toBe("2.0.2");
+    expect(pkg.peerDependencies?.["@opencode/plugin"]).toBe("2.0.15");
+    expect(pkg.devDependencies?.["@opencode/plugin"]).toBe("2.0.15");
     expect(pkg.dependencies?.["@opentui/core"]).toBe("^0.5.10");
     expect(pkg.dependencies?.["@opentui/solid"]).toBe("^0.5.10");
     expect(readme).toContain("Node.js `>= 22` is required.");
@@ -165,7 +165,7 @@ describe("package manifest compatibility", () => {
   it("keeps the TypeScript 7 toolchain explicit without suppressing the known peer mismatch", () => {
     expect(tsconfig.compilerOptions?.types).toEqual(["node"]);
     expect(typescriptValidator).toContain('const EXPECTED_TYPESCRIPT_VERSION = "7.0.2";');
-    expect(typescriptValidator).toContain('const EXPECTED_PLUGIN_VERSION = "1.18.1";');
+    expect(typescriptValidator).toContain('const EXPECTED_PLUGIN_VERSION = "2.0.15";');
     expect(typescriptValidator).toContain('const EXPECTED_OPENTUI_SPECIFIER = "^0.5.10";');
     expect(typescriptValidator).toContain('const EXPECTED_OPENTUI_VERSION = "0.5.10";');
     expect(typescriptValidator).toContain('const BUN_FFI_STRUCTS_VERSION = "0.3.1";');
@@ -285,7 +285,7 @@ describe("package manifest compatibility", () => {
     expect(pkg.bin).toEqual({
       "opencode-quota": "./dist/bin/opencode-quota.js",
     });
-    expect(pkg["oc-plugin"]).toEqual(["server", "tui"]);
+    expect(pkg["oc-plugin"]).toBeUndefined();
     expect(pkg.dependencies?.["@clack/prompts"]).toBeTruthy();
     expect(pkg.exports?.["."]).toEqual({
       default: "./dist/index.js",

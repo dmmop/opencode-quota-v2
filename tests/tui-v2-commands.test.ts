@@ -46,6 +46,12 @@ describe("V2 quota TUI commands", () => {
     expect(context.ui.slot).toHaveBeenCalledWith(
       expect.objectContaining({ append: "sidebar.content" }),
     );
+    expect(context.ui.slot).toHaveBeenCalledWith(
+      expect.objectContaining({ append: "prompt.footer" }),
+    );
+    expect(context.ui.slot).toHaveBeenCalledWith(
+      expect.objectContaining({ append: "home.footer.status" }),
+    );
     expect(context.data.on.mock.calls.map(([event]) => event)).toEqual([
       "session.step.ended",
       "session.compaction.ended",
